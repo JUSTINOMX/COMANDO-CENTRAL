@@ -7,7 +7,9 @@ import {
   Settings2, 
   MessageSquareCode, 
   Sparkles,
-  Plug
+  Plug,
+  ChevronDown,
+  ChevronRight
 } from "lucide-react";
 import { Project, Agent, AgentNotification } from "../lib/supabase/client.js";
 import { AGENT_AREAS } from "../config/agentAreas.js";
@@ -37,6 +39,9 @@ export default function Sidebar({
 }: SidebarProps) {
 
   const [hasMcpError, setHasMcpError] = React.useState(false);
+  const [isProjectsOpen, setIsProjectsOpen] = React.useState(true);
+  const [isAgentsOpen, setIsAgentsOpen] = React.useState(true);
+
   React.useEffect(() => {
     fetch("/api/mcps")
       .then(res => res.json())
@@ -106,11 +111,11 @@ export default function Sidebar({
           targetAreaId = "estrategico";
         } else if (roleLower.includes("investig") || roleLower.includes("anal") || nameLower.includes("elon")) {
           targetAreaId = "investigacion";
-        } else if (roleLower.includes("market") || roleLower.includes("ventas") || nameLower.includes("nikitta")) {
+        } else if (roleLower.includes("market") || roleLower.includes("ventas") || nameLower.includes("nikitta") || nameLower.includes("luisa")) {
           targetAreaId = "marketing";
         } else if (roleLower.includes("vision") || roleLower.includes("disen") || roleLower.includes("design")) {
           targetAreaId = "vision";
-        } else if (roleLower.includes("manager") || roleLower.includes("admin") || roleLower.includes("coord")) {
+        } else if (roleLower.includes("manager") || roleLower.includes("admin") || roleLower.includes("coord") || nameLower.includes("donna") || nameLower.includes("justino") || roleLower.includes("juridic") || roleLower.includes("secretar") || roleLower.includes("contab") || roleLower.includes("finanz")) {
           targetAreaId = "management";
         }
 
@@ -216,70 +221,109 @@ export default function Sidebar({
             <span className="text-base shrink-0">🛠️</span>
             <span>STEVE</span>
           </button>
+
+          {/* 🏛️ Consejo */}
+          <button
+            onClick={() => onNavigate("council")}
+            className={`flex items-center gap-3 rounded-lg px-3 py-1.5 text-sm font-medium transition-all ${
+              activeSection === "council"
+                ? "bg-slate-100 text-slate-900 font-semibold shadow-sm border-l-2 border-slate-500"
+                : "text-text-secondary hover:bg-gray-50 hover:text-text-primary"
+            }`}
+            id="sidebar-council-button"
+          >
+            <span className="text-base shrink-0">🏛️</span>
+            <span>Sala del Consejo</span>
+          </button>
         </div>
 
         {/* Projects section */}
         <div className="flex flex-col gap-1 shrink-0">
-          <div className="flex items-center justify-between px-3 mb-1">
-            <span className="text-[10px] font-bold text-text-secondary uppercase tracking-widest">Active Projects</span>
+          <button 
+            onClick={() => setIsProjectsOpen(!isProjectsOpen)}
+            className="flex items-center justify-between px-3 mb-1 w-full text-left hover:text-text-primary focus:outline-none"
+          >
+            <div className="flex items-center gap-1.5">
+              {isProjectsOpen ? (
+                <ChevronDown className="h-3.5 w-3.5 text-text-secondary shrink-0" />
+              ) : (
+                <ChevronRight className="h-3.5 w-3.5 text-text-secondary shrink-0" />
+              )}
+              <span className="text-[10px] font-bold text-text-secondary uppercase tracking-widest">Active Projects</span>
+            </div>
             <span className="rounded bg-[#E8F2FF] px-1.5 py-0.5 text-[9px] font-bold text-primary">
               {projects.length}
             </span>
-          </div>
+          </button>
 
-          <div className="flex flex-col gap-0.5 max-h-32 overflow-y-auto pr-1">
-            {projects.length === 0 ? (
-              <p className="px-3 py-2 text-xs italic text-gray-400">No active projects.</p>
-            ) : (
-              projects.map((p) => {
-                const isActive = activeSection === "project" && activeProjectId === p.id;
-                return (
-                  <button
-                    key={p.id}
-                    onClick={() => onNavigate("project", p.id)}
-                    className={`group flex items-center justify-between rounded-lg px-3 py-1 text-sm font-medium transition-all ${
-                      isActive
-                        ? "bg-[#E8F2FF] text-primary font-semibold border-l-2 border-primary"
-                        : "text-text-secondary hover:bg-gray-50 hover:text-text-primary"
-                    }`}
-                  >
-                    <div className="flex items-center gap-2 truncate">
-                      <FolderGit2 className={`h-3.5 w-3.5 shrink-0 ${isActive ? "text-primary" : "text-text-secondary"}`} />
-                      <span className="truncate text-xs">{p.name}</span>
-                    </div>
-                    
-                    <div className="flex items-center gap-1.5">
-                      {p.message_count !== undefined && p.message_count > 0 && (
-                        <span className="rounded bg-gray-100 px-1 py-0.2 text-[9px] text-text-secondary font-mono group-hover:bg-gray-200">
-                          {p.message_count}
-                        </span>
-                      )}
-                      {p.has_notifications && (
-                        <span className="h-1.5 w-1.5 rounded-full bg-[#FF375F]" />
-                      )}
-                    </div>
-                  </button>
-                );
-              })
-            )}
-          </div>
+          {isProjectsOpen && (
+            <div className="flex flex-col gap-0.5 max-h-32 overflow-y-auto pr-1">
+              {projects.length === 0 ? (
+                <p className="px-3 py-2 text-xs italic text-gray-400">No active projects.</p>
+              ) : (
+                projects.map((p) => {
+                  const isActive = activeSection === "project" && activeProjectId === p.id;
+                  return (
+                    <button
+                      key={p.id}
+                      onClick={() => onNavigate("project", p.id)}
+                      className={`group flex items-center justify-between rounded-lg px-3 py-1 text-sm font-medium transition-all ${
+                        isActive
+                          ? "bg-[#E8F2FF] text-primary font-semibold border-l-2 border-primary"
+                          : "text-text-secondary hover:bg-gray-50 hover:text-text-primary"
+                      }`}
+                    >
+                      <div className="flex items-center gap-2 truncate">
+                        <FolderGit2 className={`h-3.5 w-3.5 shrink-0 ${isActive ? "text-primary" : "text-text-secondary"}`} />
+                        <span className="truncate text-xs">{p.name}</span>
+                      </div>
+                      
+                      <div className="flex items-center gap-1.5">
+                        {p.message_count !== undefined && p.message_count > 0 && (
+                          <span className="rounded bg-gray-100 px-1 py-0.2 text-[9px] text-text-secondary font-mono group-hover:bg-gray-200">
+                            {p.message_count}
+                          </span>
+                        )}
+                        {p.has_notifications && (
+                          <span className="h-1.5 w-1.5 rounded-full bg-[#FF375F]" />
+                        )}
+                      </div>
+                    </button>
+                  );
+                })
+              )}
+            </div>
+          )}
         </div>
 
         {/* AGENTS SECTION */}
-        <div className="flex flex-col gap-1 flex-1 min-h-[180px] overflow-y-auto pr-1">
-          <span className="px-3 text-[10px] font-bold text-text-secondary uppercase tracking-widest mb-1 shrink-0">
-            AGENTES
-          </span>
-          <div className="flex flex-col">
-            {mergedAreas.map((area) => (
-              <SidebarAgentArea
-                key={area.id}
-                area={area}
-                activeAgentName={activeSection === "agent-chat" ? activeAgentName : undefined}
-                onSelectAgent={(name) => onNavigate("agent-chat", undefined, name)}
-              />
-            ))}
-          </div>
+        <div className={`flex flex-col gap-1 ${isAgentsOpen ? "flex-1 min-h-[180px]" : "shrink-0"} overflow-y-auto pr-1`}>
+          <button
+            onClick={() => setIsAgentsOpen(!isAgentsOpen)}
+            className="flex items-center gap-1.5 px-3 mb-1 text-left hover:text-text-primary focus:outline-none w-full"
+          >
+            {isAgentsOpen ? (
+              <ChevronDown className="h-3.5 w-3.5 text-text-secondary shrink-0" />
+            ) : (
+              <ChevronRight className="h-3.5 w-3.5 text-text-secondary shrink-0" />
+            )}
+            <span className="text-[10px] font-bold text-text-secondary uppercase tracking-widest">
+              AGENTES
+            </span>
+          </button>
+          
+          {isAgentsOpen && (
+            <div className="flex flex-col">
+              {mergedAreas.map((area) => (
+                <SidebarAgentArea
+                  key={area.id}
+                  area={area}
+                  activeAgentName={activeSection === "agent-chat" ? activeAgentName : undefined}
+                  onSelectAgent={(name) => onNavigate("agent-chat", undefined, name)}
+                />
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Configuration Section */}

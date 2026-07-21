@@ -41,7 +41,8 @@ export const AGENT_AREAS: AgentArea[] = [
     icon: "📈",
     agents: [
       { name: "nikitta", displayName: "NIKITTA", role: "marketing", status: "active", source: "native" },
-      ...Array(9).fill(null).map((_, i) => ({
+      { name: "luisa", displayName: "LUISA", role: "directora-marketing", status: "active", source: "native" },
+      ...Array(8).fill(null).map((_, i) => ({
         name: `vacante-marketing-${i + 1}`,
         displayName: "─ Vacante ─",
         role: "",
@@ -67,7 +68,9 @@ export const AGENT_AREAS: AgentArea[] = [
     name: "MANAGEMENT",
     icon: "📋",
     agents: [
-      ...Array(3).fill(null).map((_, i) => ({
+      { name: "justino", displayName: "JUSTINO", role: "director-juridico", status: "active", source: "native" },
+      { name: "donna", displayName: "DONNA", role: "secretaria-consejo", status: "active", source: "native" },
+      ...Array(1).fill(null).map((_, i) => ({
         name: `vacante-management-${i + 1}`,
         displayName: "─ Vacante ─",
         role: "",

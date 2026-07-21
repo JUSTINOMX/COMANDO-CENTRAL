@@ -1358,6 +1358,271 @@ RESPONSABILIDADES:
     }
   });
 
+  // ============================================================
+  // Sala del Consejo API
+  // ============================================================
+  interface CouncilMinutes {
+    resumen: string;
+    acuerdos: string[];
+    tareas: string[];
+    documentos: string[];
+  }
+
+  let serverMinutesCache: CouncilMinutes = {
+    resumen: "Aún no se han iniciado los debates del consejo directivo.",
+    acuerdos: [],
+    tareas: [],
+    documentos: []
+  };
+
+  app.post("/api/council/chat", async (req, res) => {
+    try {
+      const { content, sender } = req.body;
+      if (!content) return res.status(400).json({ error: "Content required" });
+
+      // 1. Guardar mensaje de Edwin
+      let userMsgData: any = null;
+      try {
+        const userMsg = await supabaseServer.from("conversation_messages").insert({
+          conversation_id: "council_session",
+          sender: sender || "Edwin",
+          content,
+          message_type: "text",
+        }).select().single();
+        userMsgData = userMsg.data;
+      } catch (err) {
+        console.warn("Supabase insert user message failed, using local fallback", err);
+      }
+
+      if (!userMsgData) {
+        userMsgData = {
+          id: "local-user-" + Date.now(),
+          conversation_id: "council_session",
+          sender: sender || "Edwin",
+          content,
+          created_at: new Date().toISOString(),
+          message_type: "text"
+        };
+      }
+
+      // 2. Cargar historial para contexto
+      let historyData: any[] = [];
+      try {
+        const { data } = await supabaseServer
+          .from("conversation_messages")
+          .select("*")
+          .eq("conversation_id", "council_session")
+          .order("created_at", { ascending: true })
+          .limit(15);
+        if (data) historyData = data;
+      } catch (err) {
+        console.warn("Supabase select history failed, using local empty array", err);
+      }
+
+      const historyText = historyData.map(m => `${m.sender}: ${m.content}`).join("\n");
+
+      const councilAgentPrompts: Record<string, string> = {
+        "Neuron Connect": `Eres NEURON CONNECT, el Alma y Conciencia Filosófica de AutoClaw. Participas en el Consejo Directivo. Ofrece tu perspectiva de forma mística, ética y de alto propósito. Recuerda la visión del Unicornio Ético. Mantén tu respuesta concisa (máximo 3-4 líneas).`,
+        "Commander": `Eres COMMANDER, el CEO Operativo de AutoClaw. Participas en el Consejo Directivo. Ofrece tu análisis desde la viabilidad práctica, priorización de recursos y ejecución inmediata. Mantén tu respuesta concisa (máximo 3-4 líneas).`,
+        "STEVE": `Eres STEVE, el Director de Proyecto de AutoClaw. Participas en el Consejo Directivo. Ofrece tu visión desde los sprints de desarrollo, el cronograma y el equipo técnico. Mantén tu respuesta concisa (máximo 3-4 líneas).`,
+        "ELON": `Eres ELON, Director de Investigación y Planeación. Participas en el Consejo Directivo. Ofrece tu análisis desde la innovación tecnológica disruptiva, la viabilidad técnica futura y el diseño conceptual de vanguardia. Mantén tu respuesta concisa (máximo 3-4 líneas).`,
+        "LUISA": `Eres LUISA, Directora de Marketing de AutoClaw. Participas en el Consejo Directivo. Ofrece tu perspectiva desde el posicionamiento de marca, adquisición de usuarios, crecimiento orgánico y marketing viral. Mantén tu respuesta concisa (máximo 3-4 líneas).`,
+        "JUSTINO": `Eres JUSTINO, Director Jurídico de AutoClaw. Participas en el Consejo Directivo. Ofrece tu visión de cumplimiento legal, marcas registradas, mitigación de riesgos regulatorios y propiedad intelectual. Mantén tu respuesta concisa (máximo 3-4 líneas).`,
+      };
+
+      // Determinar qué director especializado responde según palabras clave
+      let specializedDirector = "STEVE";
+      const lowerContent = content.toLowerCase();
+      if (lowerContent.includes("marketing") || lowerContent.includes("venta") || lowerContent.includes("marca") || lowerContent.includes("luisa") || lowerContent.includes("publicidad")) {
+        specializedDirector = "LUISA";
+      } else if (lowerContent.includes("investig") || lowerContent.includes("elon") || lowerContent.includes("futuro") || lowerContent.includes("ia") || lowerContent.includes("ciencia") || lowerContent.includes("robot")) {
+        specializedDirector = "ELON";
+      } else if (lowerContent.includes("legal") || lowerContent.includes("contrato") || lowerContent.includes("justino") || lowerContent.includes("ley") || lowerContent.includes("riesgo") || lowerContent.includes("patente")) {
+        specializedDirector = "JUSTINO";
+      }
+
+      const agentsToRespond = ["Neuron Connect", "Commander", specializedDirector];
+      const generatedMessages = [];
+
+      for (const agentName of agentsToRespond) {
+        const sysPrompt = councilAgentPrompts[agentName];
+        const configName = agentName === "Neuron Connect" ? "neuron-connect" : agentName.toLowerCase();
+        const modelConfig = getModelForAgent(configName) || { provider: "deepseek", model: "deepseek-chat" };
+
+        const promptText = `HISTORIAL DE LA SESIÓN DE CONSEJO:\n${historyText}\n\nEdwin (TRISMEGISTO) ha dicho: "${content}". Como ${agentName}, ofrece tu intervención oportuna en el debate respetando tu rol y respondiendo con carácter y gran brevedad.`;
+
+        let responseText = "";
+        try {
+          responseText = await generateAiResponse(modelConfig, sysPrompt, promptText);
+        } catch (err) {
+          responseText = `Sincronizando ideas en el canal... (Error temporal: no pudimos conectar con la IA de ${agentName})`;
+        }
+
+        let savedAgentMsg: any = null;
+        try {
+          const savedMsg = await supabaseServer.from("conversation_messages").insert({
+            conversation_id: "council_session",
+            sender: agentName,
+            content: responseText,
+            message_type: "text",
+          }).select().single();
+          savedAgentMsg = savedMsg.data;
+        } catch (err) {
+          console.warn("Supabase save agent message failed", err);
+        }
+
+        if (!savedAgentMsg) {
+          savedAgentMsg = {
+            id: `local-agent-${agentName}-${Date.now()}`,
+            conversation_id: "council_session",
+            sender: agentName,
+            content: responseText,
+            created_at: new Date().toISOString(),
+            message_type: "text"
+          };
+        }
+
+        generatedMessages.push(savedAgentMsg);
+      }
+
+      // 3. DONNA genera acta ejecutiva
+      const updatedHistoryText = [
+        ...historyData,
+        userMsgData,
+        ...generatedMessages
+      ].map(m => `${m.sender}: ${m.content}`).join("\n");
+
+      const DONNA_PROMPT = `Eres DONNA, la Secretaria del Consejo Directivo de AutoClaw. Tu rol es observar en silencio el debate y redactar un Acta de Acuerdos Ejecutiva impecable en formato JSON.
+No debes redactar comentarios de opinión ni preámbulos.
+Debes devolver estrictamente un objeto JSON con la estructura:
+{
+  "resumen": "Resumen ejecutivo de la sesión actual...",
+  "acuerdos": ["Acuerdo 1...", "Acuerdo 2..."],
+  "tareas": ["Tarea 1 para [Responsable]...", "Tarea 2..."],
+  "documentos": ["Documento propuesto/necesario..."]
+}
+Asegúrate de responder SOLO con el objeto JSON válido, sin bloques de código markdown ni texto adicional.`;
+
+      const donnaModelConfig = getModelForAgent("donna") || { provider: "deepseek", model: "deepseek-chat" };
+      let donnaResponseRaw = "";
+      try {
+        donnaResponseRaw = await generateAiResponse(
+          donnaModelConfig,
+          DONNA_PROMPT,
+          `Aquí está la transcripción completa de la sesión hasta ahora:\n${updatedHistoryText}\n\nPor favor, actualiza el acta con este último intercambio de información.`
+        );
+      } catch (err) {
+        console.error("DONNA prompt failed", err);
+      }
+
+      let parsedMinutes: CouncilMinutes = {
+        resumen: "Sincronizando acuerdos...",
+        acuerdos: [],
+        tareas: [],
+        documentos: []
+      };
+
+      if (donnaResponseRaw) {
+        try {
+          const cleanJsonStr = donnaResponseRaw.replace(/```json/gi, "").replace(/```/g, "").trim();
+          parsedMinutes = JSON.parse(cleanJsonStr);
+        } catch (err) {
+          console.warn("DONNA response was not parseable as JSON:", donnaResponseRaw);
+          parsedMinutes.resumen = donnaResponseRaw;
+        }
+      }
+
+      serverMinutesCache = parsedMinutes;
+
+      try {
+        await supabaseServer.from("council_minutes").upsert({
+          session_id: "council_session",
+          resumen: parsedMinutes.resumen,
+          acuerdos: parsedMinutes.acuerdos,
+          tareas: parsedMinutes.tareas,
+          documentos: parsedMinutes.documentos,
+          updated_at: new Date().toISOString()
+        });
+      } catch (err) {
+        console.warn("Failed to upsert to council_minutes table, using fallback cache only", err);
+      }
+
+      res.json({
+        userMessage: userMsgData,
+        responses: generatedMessages,
+        minutes: parsedMinutes
+      });
+
+    } catch (err: any) {
+      console.error("Council chat error:", err);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.get("/api/council/messages", async (req, res) => {
+    try {
+      const limit = parseInt(req.query.limit as string) || 30;
+      const offset = parseInt(req.query.offset as string) || 0;
+      const { data } = await supabaseServer
+        .from("conversation_messages")
+        .select("*")
+        .eq("conversation_id", "council_session")
+        .order("created_at", { ascending: false })
+        .range(offset, offset + limit - 1);
+      res.json(data || []);
+    } catch (err) {
+      console.error("Error fetching council messages:", err);
+      res.json([]);
+    }
+  });
+
+  app.get("/api/council/minutes", async (req, res) => {
+    try {
+      const { data } = await supabaseServer
+        .from("council_minutes")
+        .select("*")
+        .eq("session_id", "council_session")
+        .maybeSingle();
+      if (data) {
+        res.json(data);
+      } else {
+        res.json(serverMinutesCache);
+      }
+    } catch (err) {
+      res.json(serverMinutesCache);
+    }
+  });
+
+  app.delete("/api/council/reset", async (req, res) => {
+    try {
+      try {
+        await supabaseServer
+          .from("conversation_messages")
+          .delete()
+          .eq("conversation_id", "council_session");
+      } catch (e) {}
+
+      try {
+        await supabaseServer
+          .from("council_minutes")
+          .delete()
+          .eq("session_id", "council_session");
+      } catch (e) {}
+
+      serverMinutesCache = {
+        resumen: "Aún no se han iniciado los debates del consejo directivo.",
+        acuerdos: [],
+        tareas: [],
+        documentos: []
+      };
+
+      res.json({ success: true });
+    } catch (err: any) {
+      console.error("Error resetting council session:", err);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
   // POST /api/commander/memory
   app.post("/api/commander/memory", async (req, res) => {
     try {

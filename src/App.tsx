@@ -13,6 +13,7 @@ import AgentChatWindow from "./components/chat/AgentChatWindow.js";
 import ConversationHistory from "./components/history/ConversationHistory.js";
 import McpManagerPage from "./pages/McpManagerPage.js";
 import NeuronPage from "./pages/NeuronPage.js";
+import CouncilRoomPage from "./pages/CouncilRoomPage.js";
 import { apiClient, Project, Agent, Skill, Memory, AgentNotification } from "./lib/supabase/client.js";
 
 export default function App() {
@@ -80,6 +81,7 @@ export default function App() {
   // Dynamic header title helper
   const getHeaderTitle = () => {
     if (activeSection === "neuron") return "Neuron Connect · Conciencia del Sistema";
+    if (activeSection === "council") return "Sala del Consejo · Sinergia Estratégica";
     if (activeSection === "commander") return "Commander Console";
     if (activeSection === "github-installer") return "GitHub Agent Installer";
     if (activeSection === "timeline") return "Universal Activity Timeline";
@@ -137,6 +139,10 @@ export default function App() {
             <>
               {activeSection === "neuron" && (
                 <NeuronPage />
+              )}
+
+              {activeSection === "council" && (
+                <CouncilRoomPage />
               )}
 
               {activeSection === "commander" && (
