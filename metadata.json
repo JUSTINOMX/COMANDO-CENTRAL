@@ -1,0 +1,6 @@
+{
+  "name": "AutoClaw Command Center",
+  "description": "The control center for the AutoClaw AI agent ecosystem, featuring live timelines, project workspaces, and a conversational AI Commander assistant.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
