@@ -9,11 +9,17 @@ import MemoryView from "./components/MemoryView.js";
 import SettingsView from "./components/SettingsView.js";
 import CommanderPage from "./pages/CommanderPage.js";
 import GitHubInstallerPage from "./pages/GitHubInstallerPage.js";
+import AgentChatWindow from "./components/chat/AgentChatWindow.js";
+import ConversationHistory from "./components/history/ConversationHistory.js";
+import McpManagerPage from "./pages/McpManagerPage.js";
 import { apiClient, Project, Agent, Skill, Memory, AgentNotification } from "./lib/supabase/client.js";
 
 export default function App() {
   const [activeSection, setActiveSection] = useState<string>("timeline");
   const [activeProjectId, setActiveProjectId] = useState<string | undefined>(undefined);
+  const [activeAgentName, setActiveAgentName] = useState<string | undefined>(undefined);
+  const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
+  const [refreshHistoryTrigger, setRefreshHistoryTrigger] = useState<number>(0);
 
   // Core collections
   const [projects, setProjects] = useState<Project[]>([]);
@@ -54,12 +60,19 @@ export default function App() {
     return () => clearInterval(interval);
   }, []);
 
-  const handleNavigate = (section: string, projectId?: string) => {
+  const handleNavigate = (section: string, projectId?: string, agentName?: string) => {
     setActiveSection(section);
     if (section === "project" && projectId) {
       setActiveProjectId(projectId);
     } else {
       setActiveProjectId(undefined);
+    }
+
+    if (section === "agent-chat" && agentName) {
+      setActiveAgentName(agentName);
+      setActiveConversationId(null);
+    } else {
+      setActiveAgentName(undefined);
     }
   };
 
@@ -75,7 +88,12 @@ export default function App() {
     if (activeSection === "agents") return "AI Agents Catalog";
     if (activeSection === "skills") return "Ecosystem Automation Skills";
     if (activeSection === "memory") return "Ecosystem Memory Matrix";
+    if (activeSection === "mcps") return "Gestión de MCP Servers";
     if (activeSection === "settings") return "System Settings";
+    if (activeSection === "agent-chat" && activeAgentName) {
+      const display = activeAgentName.charAt(0).toUpperCase() + activeAgentName.slice(1);
+      return `Conversación Directa: ${display}`;
+    }
     return "AutoClaw Command Center";
   };
 
@@ -90,7 +108,10 @@ export default function App() {
         activeSection={activeSection}
         onNavigate={handleNavigate}
         projects={projects}
+        agents={agents}
+        notifications={notifications}
         activeProjectId={activeProjectId}
+        activeAgentName={activeAgentName}
         hasUnreadCommander={hasUnreadCommander}
       />
 
@@ -104,7 +125,7 @@ export default function App() {
         />
 
         {/* Dynamic View Panel */}
-        <main className="flex-1 overflow-y-auto bg-gray-50/20">
+        <main className={`flex-1 bg-gray-50/20 ${activeSection === "agent-chat" ? "overflow-hidden" : "overflow-y-auto"}`}>
           {isLoading && projects.length === 0 ? (
             <div className="flex h-full items-center justify-center text-sm font-medium text-gray-400 font-mono">
               <span className="animate-spin h-5 w-5 border-2 border-purple-500 border-t-transparent rounded-full mr-3" />
@@ -169,8 +190,42 @@ export default function App() {
                 />
               )}
 
+              {activeSection === "mcps" && (
+                <McpManagerPage agents={agents} />
+              )}
+
               {activeSection === "settings" && (
                 <SettingsView />
+              )}
+
+              {activeSection === "agent-chat" && activeAgentName && (
+                (() => {
+                  const selectedAgent = agents.find(a => a.name.toLowerCase() === activeAgentName.toLowerCase()) || {
+                    id: "placeholder",
+                    name: activeAgentName,
+                    display_name: activeAgentName.charAt(0).toUpperCase() + activeAgentName.slice(1),
+                    role: "Asistente",
+                    status: "vacant"
+                  } as Agent;
+
+                  return (
+                    <div className="flex h-full w-full overflow-hidden">
+                      <AgentChatWindow
+                        agent={selectedAgent}
+                        projects={projects}
+                        defaultProjectId={activeProjectId}
+                        activeConversationId={activeConversationId}
+                        onNewMessageSent={() => setRefreshHistoryTrigger(p => p + 1)}
+                      />
+                      <ConversationHistory
+                        agentName={activeAgentName}
+                        activeConversationId={activeConversationId}
+                        onSelectConversation={(convoId) => setActiveConversationId(convoId)}
+                        refreshTrigger={refreshHistoryTrigger}
+                      />
+                    </div>
+                  );
+                })()
               )}
             </>
           )}

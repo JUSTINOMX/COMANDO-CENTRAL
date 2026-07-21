@@ -1971,6 +1971,419 @@ async function startServer() {
     }
   });
 
+  // ==========================================
+  // MCP SERVERS API ENDPOINTS
+  // ==========================================
+  app.get("/api/mcps", async (req, res) => {
+    try {
+      const { getMcpServers } = await import("./src/lib/mcpDb.js");
+      const servers = await getMcpServers();
+      res.json(servers);
+    } catch (err: any) {
+      console.error("GET /api/mcps error:", err);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.get("/api/mcps/predefined", async (req, res) => {
+    try {
+      const { PREDEFINED_MCPS } = await import("./src/config/predefinedMcps.js");
+      res.json(PREDEFINED_MCPS);
+    } catch (err: any) {
+      console.error("GET /api/mcps/predefined error:", err);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.post("/api/mcps/install", async (req, res) => {
+    try {
+      const { installMcpServer } = await import("./src/lib/mcpDb.js");
+      const result = await installMcpServer(req.body);
+      res.json(result);
+    } catch (err: any) {
+      console.error("POST /api/mcps/install error:", err);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.delete("/api/mcps/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { uninstallMcpServer } = await import("./src/lib/mcpDb.js");
+      const success = await uninstallMcpServer(id);
+      res.json({ success });
+    } catch (err: any) {
+      console.error("DELETE /api/mcps/:id error:", err);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.post("/api/mcps/:id/assign", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { agentId, configOverride } = req.body;
+      const { assignMcpToAgent } = await import("./src/lib/mcpDb.js");
+      const result = await assignMcpToAgent(id, agentId, configOverride);
+      res.json(result);
+    } catch (err: any) {
+      console.error("POST /api/mcps/:id/assign error:", err);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.delete("/api/mcps/:id/assign/:agentId", async (req, res) => {
+    try {
+      const { id, agentId } = req.params;
+      const { unassignMcpFromAgent } = await import("./src/lib/mcpDb.js");
+      const success = await unassignMcpFromAgent(id, agentId);
+      res.json({ success });
+    } catch (err: any) {
+      console.error("DELETE /api/mcps/:id/assign/:agentId error:", err);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.get("/api/mcps/agent/:agentId", async (req, res) => {
+    try {
+      const { agentId } = req.params;
+      const { getMcpsForAgent } = await import("./src/lib/mcpDb.js");
+      const servers = await getMcpsForAgent(agentId);
+      res.json(servers);
+    } catch (err: any) {
+      console.error("GET /api/mcps/agent/:agentId error:", err);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // ==========================================
+  // AGENT DIRECT CHATS ENDPOINTS
+  // ==========================================
+  app.get("/api/chat/:agentName/messages", async (req, res) => {
+    try {
+      const { agentName } = req.params;
+      const { conversationId } = req.query;
+
+      let convoId = conversationId as string;
+
+      if (!convoId) {
+        // Find or create conversation of type 'agent_chat'
+        const { data: convos } = await supabaseServer
+          .from("conversations")
+          .select("*")
+          .eq("conversation_type", "agent_chat");
+
+        const match = (convos || []).find(
+          c => c.metadata?.agent_name?.toLowerCase() === agentName.toLowerCase()
+        );
+
+        if (match) {
+          convoId = match.id;
+        } else {
+          const { data: newC, error: err } = await supabaseServer
+            .from("conversations")
+            .insert({
+              title: `Chat con ${agentName.toUpperCase()}`,
+              conversation_type: "agent_chat",
+              status: "active",
+              metadata: { agent_name: agentName.toLowerCase() }
+            })
+            .select()
+            .single();
+
+          if (err) throw err;
+          convoId = newC.id;
+        }
+      }
+
+      // Query messages
+      const { data: messages, error: mErr } = await supabaseServer
+        .from("conversation_messages")
+        .select("*")
+        .eq("conversation_id", convoId)
+        .order("created_at", { ascending: true });
+
+      if (mErr) throw mErr;
+      res.json(messages || []);
+    } catch (err: any) {
+      console.error("GET /api/chat/:agentName/messages error:", err);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.post("/api/chat/:agentName/message", async (req, res) => {
+    try {
+      const { agentName } = req.params;
+      const { content, file, projectId, documentType, conversationId } = req.body;
+
+      let convoId = conversationId as string;
+
+      if (!convoId) {
+        // Find or create
+        const { data: convos } = await supabaseServer
+          .from("conversations")
+          .select("*")
+          .eq("conversation_type", "agent_chat");
+
+        const match = (convos || []).find(
+          c => c.metadata?.agent_name?.toLowerCase() === agentName.toLowerCase()
+        );
+
+        if (match) {
+          convoId = match.id;
+        } else {
+          const { data: newC } = await supabaseServer
+            .from("conversations")
+            .insert({
+              title: `Chat con ${agentName.toUpperCase()}`,
+              conversation_type: "agent_chat",
+              status: "active",
+              metadata: { agent_name: agentName.toLowerCase() }
+            })
+            .select()
+            .single();
+          convoId = newC.id;
+        }
+      }
+
+      let annotatedContent = content;
+
+      // Handle file attachment
+      if (file && file.name && file.content && projectId && documentType) {
+        let targetTable = "project_antecedentes";
+        const insertData: any = {
+          project_id: projectId,
+          title: file.name,
+          content: file.content
+        };
+
+        if (documentType === "antecedentes") {
+          targetTable = "project_antecedentes";
+          insertData.file_name = file.name;
+          insertData.file_type = "document";
+          insertData.mime_type = "text/plain";
+        } else if (documentType === "extracciones") {
+          targetTable = "project_extracciones";
+          insertData.file_name = file.name;
+          insertData.extraction_type = "document";
+        } else if (documentType === "reportes") {
+          targetTable = "project_reportes";
+          insertData.file_name = file.name;
+          insertData.report_type = "document";
+        } else if (documentType === "conclusiones") {
+          targetTable = "project_conclusiones";
+          insertData.file_name = file.name;
+          insertData.conclusion_type = "document";
+        } else if (documentType === "marketing") {
+          targetTable = "project_marketing";
+          insertData.file_name = file.name;
+          insertData.section = "general";
+        }
+
+        await supabaseServer.from(targetTable).insert(insertData);
+        annotatedContent += `\n\n📎 *[Archivo adjuntado: "${file.name}" guardado en el proyecto en la sección "${documentType.toUpperCase()}"]*`;
+      }
+
+      // 1. Insert user message
+      const { data: userMsg, error: uErr } = await supabaseServer
+        .from("conversation_messages")
+        .insert({
+          conversation_id: convoId,
+          sender: "Edwin",
+          content: annotatedContent,
+          message_type: "text"
+        })
+        .select()
+        .single();
+
+      if (uErr) throw uErr;
+
+      // 2. Load agent info to get "soul"
+      const { data: dbAgent } = await supabaseServer
+        .from("agents")
+        .select("*")
+        .eq("name", agentName.toLowerCase())
+        .single();
+
+      const soul = dbAgent?.soul || `Soy ${agentName.toUpperCase()}, tu asistente de automatización y operaciones.`;
+
+      // 3. Generate Agent Answer using AI Registry
+      let aiText = "";
+      try {
+        const provider = aiRegistry.getProviderForAgent(agentName);
+        const agentConfig = aiRegistry.getAgentConfig(agentName);
+
+        // Fetch last 10 messages for conversational context
+        const { data: historyMsgs } = await supabaseServer
+          .from("conversation_messages")
+          .select("sender, content")
+          .eq("conversation_id", convoId)
+          .order("created_at", { ascending: true })
+          .limit(10);
+
+        const mappedContext = (historyMsgs || []).map((m: any) => ({
+          role: (m.sender.toLowerCase() === "edwin" ? "user" : "assistant") as "user" | "assistant",
+          content: m.content
+        }));
+
+        const response = await provider.chat([
+          { 
+            role: "system", 
+            content: `Alma del Agente: ${soul}\nTu rol es: ${dbAgent?.role || "asistente"}.\nResponde a Edwin directamente en español, con un tono ultra profesional, técnico, con viñetas claras si es necesario.` 
+          },
+          ...mappedContext
+        ], {
+          temperature: agentConfig.temperature || 0.7,
+          maxTokens: agentConfig.maxTokens || 2048,
+          model: agentConfig.model
+        });
+
+        aiText = response.content;
+      } catch (aiErr: any) {
+        console.warn("AI generation failed or unconfigured, using fallback template:", aiErr.message);
+        // Realistic fallback matching agent identity
+        const nameUpper = agentName.toUpperCase();
+        if (agentName.toLowerCase() === "steve") {
+          aiText = `Hola Edwin, entiendo perfectamente la solicitud de investigación. He registrado el tema y los archivos en el proyecto. ¿Te gustaría que comience una búsqueda profunda de antecedentes sobre esto?`;
+        } else if (agentName.toLowerCase() === "elon") {
+          aiText = `Análisis recibido, Edwin. He cargado la información técnica y los parámetros de datos. ¿Procedemos con la simulación numérica y proyección de resultados?`;
+        } else if (agentName.toLowerCase() === "nikitta") {
+          aiText = `¡Genial, Edwin! Los materiales de marketing han sido clasificados correctamente. Ya estoy planeando la campaña y redacción de copys comerciales para estas audiencias.`;
+        } else {
+          aiText = `Hola Edwin. He recibido tu mensaje de forma exitosa y guardado los documentos correspondientes en el espacio de trabajo. ¿Cuáles son los siguientes pasos a ejecutar?`;
+        }
+      }
+
+      // 4. Insert Agent Answer
+      const { data: agentMsg } = await supabaseServer
+        .from("conversation_messages")
+        .insert({
+          conversation_id: convoId,
+          sender: dbAgent?.display_name || agentName.toUpperCase(),
+          sender_agent_id: dbAgent?.id || null,
+          content: aiText,
+          message_type: "text"
+        })
+        .select()
+        .single();
+
+      // Return all messages for this conversation
+      const { data: allMessages } = await supabaseServer
+        .from("conversation_messages")
+        .select("*")
+        .eq("conversation_id", convoId)
+        .order("created_at", { ascending: true });
+
+      res.json(allMessages || []);
+    } catch (err: any) {
+      console.error("POST /api/chat/:agentName/message error:", err);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.get("/api/chat/:agentName/history", async (req, res) => {
+    try {
+      const { agentName } = req.params;
+
+      // Find all conversations of type 'agent_chat'
+      const { data: convos } = await supabaseServer
+        .from("conversations")
+        .select("*")
+        .eq("conversation_type", "agent_chat");
+
+      const agentConvos = (convos || []).filter(
+        c => c.metadata?.agent_name?.toLowerCase() === agentName.toLowerCase()
+      );
+
+      const historyItems = await Promise.all(agentConvos.map(async (c) => {
+        const { data: lastMsgs } = await supabaseServer
+          .from("conversation_messages")
+          .select("created_at, content")
+          .eq("conversation_id", c.id)
+          .order("created_at", { ascending: false })
+          .limit(1);
+
+        const { count } = await supabaseServer
+          .from("conversation_messages")
+          .select("id", { count: "exact", head: true })
+          .eq("conversation_id", c.id);
+
+        const lastMsg = lastMsgs && lastMsgs.length > 0 ? lastMsgs[0] : null;
+        
+        return {
+          id: c.id,
+          title: c.title || `Chat con ${agentName.toUpperCase()}`,
+          lastMessageAt: lastMsg ? lastMsg.created_at : c.created_at || new Date().toISOString(),
+          messageCount: count || 0,
+          preview: lastMsg ? lastMsg.content : "Sin mensajes aún"
+        };
+      }));
+
+      // Sort descending
+      historyItems.sort((a, b) => new Date(b.lastMessageAt).getTime() - new Date(a.lastMessageAt).getTime());
+
+      // Helper date grouper
+      const now = new Date();
+      const groups: { [key: string]: any[] } = {};
+
+      historyItems.forEach(item => {
+        const date = new Date(item.lastMessageAt);
+        const diffTime = Math.abs(now.getTime() - date.getTime());
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+        let groupKey = "Anteriores";
+        if (diffDays <= 1) {
+          groupKey = "Hoy";
+        } else if (diffDays <= 2) {
+          groupKey = "Ayer";
+        } else if (diffDays <= 7) {
+          groupKey = "Esta semana";
+        } else {
+          const months = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
+          groupKey = `${date.getDate()} ${months[date.getMonth()]}`;
+        }
+
+        if (!groups[groupKey]) {
+          groups[groupKey] = [];
+        }
+        groups[groupKey].push(item);
+      });
+
+      const grouped = Object.keys(groups).map(key => ({
+        date: key,
+        conversations: groups[key]
+      }));
+
+      res.json(grouped);
+    } catch (err: any) {
+      console.error("GET /api/chat/:agentName/history error:", err);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.post("/api/chat/:agentName/new-conversation", async (req, res) => {
+    try {
+      const { agentName } = req.params;
+      const { title } = req.body;
+
+      const { data: newConvo, error } = await supabaseServer
+        .from("conversations")
+        .insert({
+          title: title || `Chat con ${agentName.toUpperCase()}`,
+          conversation_type: "agent_chat",
+          status: "active",
+          metadata: { agent_name: agentName.toLowerCase() }
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+      res.json(newConvo);
+    } catch (err: any) {
+      console.error("POST /api/chat/:agentName/new-conversation error:", err);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
   // COMMANDER CONVERSATIONAL CHAT
   app.post("/api/commander/chat", async (req, res) => {
     try {

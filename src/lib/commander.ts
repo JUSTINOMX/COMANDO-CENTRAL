@@ -1,6 +1,8 @@
 import { supabaseServer } from "./supabase/server.js";
 import { insertNotification, deleteByAgentId } from "./notifications.js";
 import { aiRegistry } from "./ai/registry.js";
+import { getMcpServers, installMcpServer, assignMcpToAgent } from "./mcpDb.js";
+import { PREDEFINED_MCPS } from "../config/predefinedMcps.js";
 
 interface CommanderResult {
   text: string;
@@ -112,6 +114,21 @@ You MUST parse the user's message into one of the following schemas:
 
 16. Listar agentes Hermes activos:
     { "action": "list_hermes_agents", "parameters": {} }
+
+17. Instalar o registrar un MCP Server (de npm, github o local):
+    { "action": "install_mcp_server", "parameters": { "name": "supabase-mcp", "displayName": "Supabase MCP", "description": "Acceso a base de datos", "source": "npm", "command": "npx @anthropic/supabase-mcp", "category": "database", "capabilities": ["query_db", "list_tables"] } }
+
+18. Listar todos los MCP Servers instalados:
+    { "action": "list_mcp_servers", "parameters": {} }
+
+19. Asignar un MCP Server a un agente:
+    { "action": "assign_mcp_server", "parameters": { "mcpName": "supabase-mcp", "agentName": "STEVE" } }
+
+20. Listar MCPs asignados a un agente específico:
+    { "action": "list_agent_mcps", "parameters": { "agentName": "STEVE" } }
+
+21. Mostrar el catálogo de MCPs predefinidos disponibles:
+    { "action": "show_predefined_mcps", "parameters": {} }
 
 Return ONLY a raw JSON object matching one of these formats. Do not wrap in markdown blocks unless it is clean json.
 `;
@@ -846,6 +863,109 @@ Return ONLY a raw JSON object matching one of these formats. Do not wrap in mark
         });
 
         actionsTaken.push(`Listed skills for ${dbAgent.display_name}`);
+        return { text: resp, actions_taken: actionsTaken };
+      }
+
+      case "install_mcp_server": {
+        const { name, displayName, description, source, sourceUrl, command, args, envVars, capabilities, category } = parameters;
+        const mcp = await installMcpServer({
+          name,
+          displayName: displayName || name,
+          description,
+          source: source || "npm",
+          sourceUrl: sourceUrl || "",
+          command,
+          args: args || [],
+          envVars: envVars || {},
+          capabilities: capabilities || [],
+          category: category || "general"
+        });
+        actionsTaken.push(`Instalado servidor MCP "${name}"`);
+        return {
+          text: `✅ **¡Servidor MCP "${displayName || name}" instalado con éxito!**\n\nEl driver ha sido registrado y está listo para ser asignado a los agentes de tu ecosistema.\n\n* **Comando:** \`${command}\`\n* **Source:** \`${source || "npm"}\`\n* **Capacidades:** ${capabilities && capabilities.length > 0 ? capabilities.join(", ") : "Ninguna"}\n\n¿Deseas que asigne este driver a algún agente como STEVE?`,
+          actions_taken: actionsTaken
+        };
+      }
+
+      case "list_mcp_servers": {
+        const servers = await getMcpServers();
+        if (servers.length === 0) {
+          return {
+            text: `🔌 **Servidores MCP:**\n\nActualmente no hay ningún servidor MCP instalado en el ecosistema. Puedes instalar uno desde el panel o pidiéndomelo directamente.`,
+            actions_taken: ["Listed MCP servers (empty)"]
+          };
+        }
+        let responseText = `🔌 **Servidores MCP Instalados en el Ecosistema:**\n\n`;
+        servers.forEach((s) => {
+          const statusDot = s.status === "installed" ? "🟢" : "🔴";
+          const agentsStr = s.assignedAgents && s.assignedAgents.length > 0 
+            ? s.assignedAgents.map((a: any) => `**${a.displayName}**`).join(", ")
+            : "_Ninguno_";
+          responseText += `${statusDot} **${s.displayName}** (\`${s.name}\`)\n`;
+          responseText += `   * **Source:** \`${s.source}\`\n`;
+          responseText += `   * **Comando:** \`${s.command} ${(s.args || []).join(" ")}\`\n`;
+          responseText += `   * **Agentes Asignados:** ${agentsStr}\n`;
+          responseText += `   * **Capacidades:** ${s.capabilities && s.capabilities.length > 0 ? s.capabilities.join(", ") : "Ninguna"}\n\n`;
+        });
+        actionsTaken.push("Listed MCP servers");
+        return {
+          text: responseText,
+          actions_taken: actionsTaken
+        };
+      }
+
+      case "assign_mcp_server": {
+        const { mcpName, agentName } = parameters;
+        const dbAgent = await findAgentByName(agentName);
+        if (!dbAgent) {
+          return { text: `❌ Agente "${agentName}" no encontrado.`, actions_taken: [] };
+        }
+        const servers = await getMcpServers();
+        const server = servers.find((s: any) => s.name.toLowerCase() === mcpName.toLowerCase() || s.displayName.toLowerCase() === mcpName.toLowerCase());
+        if (!server) {
+          return { text: `❌ Servidor MCP "${mcpName}" no encontrado. Verifica si está instalado.`, actions_taken: [] };
+        }
+        await assignMcpToAgent(server.id, dbAgent.id);
+        actionsTaken.push(`Asignado MCP "${server.displayName}" al agente ${dbAgent.display_name}`);
+        return {
+          text: `🔌 **Asignación de MCP exitosa:**\n\nHe asignado el driver **${server.displayName}** al agente **${dbAgent.display_name}** con éxito. Ahora el agente tiene acceso a estas capacidades: ${server.capabilities && server.capabilities.length > 0 ? server.capabilities.join(", ") : "Ninguna"}.`,
+          actions_taken: actionsTaken
+        };
+      }
+
+      case "list_agent_mcps": {
+        const { agentName } = parameters;
+        const dbAgent = await findAgentByName(agentName);
+        if (!dbAgent) {
+          return { text: `❌ Agente "${agentName}" no encontrado.`, actions_taken: [] };
+        }
+        const servers = await getMcpServers();
+        const assigned = servers.filter((s: any) => s.assignedAgents && s.assignedAgents.some((a: any) => a.id === dbAgent.id));
+        if (assigned.length === 0) {
+          return {
+            text: `🔌 El agente **${dbAgent.display_name}** actualmente no tiene ningún servidor MCP asignado.`,
+            actions_taken: [`Listed MCPs for ${dbAgent.display_name} (empty)`]
+          };
+        }
+        let resp = `🔌 **Servidores MCP asignados a ${dbAgent.display_name}:**\n\n`;
+        assigned.forEach((s) => {
+          const statusDot = s.status === "installed" ? "🟢" : "🔴";
+          resp += `${statusDot} **${s.displayName}** (\`${s.name}\`) - ${s.description || "Sin descripción"}\n`;
+        });
+        actionsTaken.push(`Listed MCPs for ${dbAgent.display_name}`);
+        return { text: resp, actions_taken: actionsTaken };
+      }
+
+      case "show_predefined_mcps": {
+        let resp = `✨ **Catálogo de MCP Servers Predefinidos Disponibles:**\n\n`;
+        PREDEFINED_MCPS.forEach((mcp) => {
+          resp += `* **${mcp.displayName}** (\`${mcp.name}\`)\n`;
+          resp += `  * **Descripción:** ${mcp.description}\n`;
+          resp += `  * **Comando base:** \`${mcp.command}\`\n`;
+          resp += `  * **Capacidades:** ${mcp.capabilities.join(", ")}\n\n`;
+        });
+        resp += `Puedes pedirme instalar cualquiera de ellos diciendo algo como *"Commander, instala el MCP de Supabase"* o configurarlo desde el panel de **🔌 MCPs**.`;
+        actionsTaken.push("Listed predefined MCP catalog");
         return { text: resp, actions_taken: actionsTaken };
       }
 

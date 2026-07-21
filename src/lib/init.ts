@@ -90,6 +90,14 @@ export async function initializeSystem() {
     // 3. Verify 'agent_notifications' table
     await initNotifications();
 
+    // 4. Verify 'mcp_servers' and 'agent_mcp_assignments' tables
+    try {
+      const { verifyMcpTables } = await import("./mcpDb.js");
+      await verifyMcpTables();
+    } catch (mcpErr) {
+      console.warn("Could not execute MCP tables verification:", mcpErr);
+    }
+
     console.log("=== INITIALIZATION COMPLETE ===");
   } catch (err: any) {
     console.error("Critical error during initialization:", err);
