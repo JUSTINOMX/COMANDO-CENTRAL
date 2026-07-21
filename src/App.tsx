@@ -12,6 +12,7 @@ import GitHubInstallerPage from "./pages/GitHubInstallerPage.js";
 import AgentChatWindow from "./components/chat/AgentChatWindow.js";
 import ConversationHistory from "./components/history/ConversationHistory.js";
 import McpManagerPage from "./pages/McpManagerPage.js";
+import NeuronPage from "./pages/NeuronPage.js";
 import { apiClient, Project, Agent, Skill, Memory, AgentNotification } from "./lib/supabase/client.js";
 
 export default function App() {
@@ -78,6 +79,7 @@ export default function App() {
 
   // Dynamic header title helper
   const getHeaderTitle = () => {
+    if (activeSection === "neuron") return "Neuron Connect · Conciencia del Sistema";
     if (activeSection === "commander") return "Commander Console";
     if (activeSection === "github-installer") return "GitHub Agent Installer";
     if (activeSection === "timeline") return "Universal Activity Timeline";
@@ -133,6 +135,10 @@ export default function App() {
             </div>
           ) : (
             <>
+              {activeSection === "neuron" && (
+                <NeuronPage />
+              )}
+
               {activeSection === "commander" && (
                 <CommanderPage
                   projects={projects}

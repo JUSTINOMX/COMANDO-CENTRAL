@@ -2,12 +2,27 @@ import { AgentArea } from "../types/agents.js";
 
 export const AGENT_AREAS: AgentArea[] = [
   {
+    id: "estrategico",
+    name: "ESTRATÉGICO",
+    icon: "🔝",
+    agents: [
+      { name: "neuron-connect", displayName: "NEURON CONNECT", role: "alma", status: "active", source: "native" },
+      { name: "commander", displayName: "COMMANDER", role: "ceo", status: "active", source: "native" },
+      { name: "steve", displayName: "STEVE", role: "director-proyecto", status: "active", source: "native" },
+    ]
+  },
+  {
     id: "investigacion",
     name: "INVESTIGACIÓN",
     icon: "🔬",
     agents: [
-      { name: "steve", displayName: "STEVE", role: "investigador", status: "active", source: "native" },
-      { name: "elon", displayName: "ELON", role: "analista", status: "active", source: "native" },
+      { name: "elon", displayName: "ELON", role: "investigador", status: "active", source: "native" },
+      ...Array(1).fill(null).map((_, i) => ({
+        name: `vacante-investigacion-${i + 1}`,
+        displayName: "─ Vacante ─",
+        role: "",
+        status: "vacant" as const
+      }))
     ]
   },
   {

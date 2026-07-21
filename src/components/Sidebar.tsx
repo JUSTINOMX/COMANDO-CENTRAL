@@ -102,7 +102,9 @@ export default function Sidebar({
         const roleLower = (dbAgent.role || "").toLowerCase();
         const nameLower = dbAgent.name.toLowerCase();
 
-        if (roleLower.includes("investig") || roleLower.includes("anal") || nameLower.includes("steve") || nameLower.includes("elon")) {
+        if (roleLower.includes("estrateg") || roleLower.includes("alma") || roleLower.includes("ceo") || nameLower.includes("neuron") || nameLower.includes("commander")) {
+          targetAreaId = "estrategico";
+        } else if (roleLower.includes("investig") || roleLower.includes("anal") || nameLower.includes("elon")) {
           targetAreaId = "investigacion";
         } else if (roleLower.includes("market") || roleLower.includes("ventas") || nameLower.includes("nikitta")) {
           targetAreaId = "marketing";
@@ -164,11 +166,25 @@ export default function Sidebar({
 
       {/* Main navigation menu */}
       <div className="flex flex-1 flex-col gap-6 overflow-y-auto pr-1">
-        {/* Core Sections */}
+        {/* Núcleo Estratégico */}
         <div className="flex flex-col gap-1 shrink-0">
-          <span className="px-3 text-[10px] font-bold text-text-secondary uppercase tracking-widest mb-1">Core</span>
-          
-          {/* Commander */}
+          <span className="px-3 text-[10px] font-bold text-text-secondary uppercase tracking-widest mb-1">Núcleo Estratégico</span>
+
+          {/* Neuron Connect */}
+          <button
+            onClick={() => onNavigate("neuron")}
+            className={`flex items-center gap-3 rounded-lg px-3 py-1.5 text-sm font-medium transition-all ${
+              activeSection === "neuron"
+                ? "bg-indigo-50 text-indigo-700 font-semibold shadow-sm border-l-2 border-indigo-500"
+                : "text-text-secondary hover:bg-gray-50 hover:text-text-primary"
+            }`}
+            id="sidebar-neuron-button"
+          >
+            <span className="text-base shrink-0">🧠</span>
+            <span>Neuron Connect</span>
+          </button>
+
+          {/* Commander (existente, mantener igual) */}
           <button
             onClick={() => onNavigate("commander")}
             className={`flex items-center justify-between rounded-lg px-3 py-1.5 text-sm font-medium transition-all ${
@@ -187,18 +203,18 @@ export default function Sidebar({
             )}
           </button>
 
-          {/* Universal Timeline */}
+          {/* STEVE */}
           <button
-            onClick={() => onNavigate("timeline")}
+            onClick={() => onNavigate("agent-chat", undefined, "steve")}
             className={`flex items-center gap-3 rounded-lg px-3 py-1.5 text-sm font-medium transition-all ${
-              activeSection === "timeline"
-                ? "bg-[#E8F2FF] text-primary font-semibold shadow-sm border-l-2 border-primary"
+              activeSection === "agent-chat" && activeAgentName === "steve"
+                ? "bg-amber-50 text-amber-700 font-semibold shadow-sm border-l-2 border-amber-400"
                 : "text-text-secondary hover:bg-gray-50 hover:text-text-primary"
             }`}
-            id="sidebar-timeline-button"
+            id="sidebar-steve-button"
           >
-            <MessageSquareCode className="h-4 w-4 text-text-secondary" />
-            <span>Timeline</span>
+            <span className="text-base shrink-0">🛠️</span>
+            <span>STEVE</span>
           </button>
         </div>
 
