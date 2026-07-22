@@ -1162,6 +1162,65 @@ async function startServer() {
 
       if (uMsgErr) throw uMsgErr;
 
+      // DETECTAR COMANDOS DE PROYECTO
+      // Si el mensaje contiene frases como "crea un proyecto", "create project", "nuevo proyecto"
+      // el servidor debe responder que el comando será procesado por Commander en AutoClaw
+      // y devolver un mensaje como:
+      // "✅ Comando recibido. Commander procesará la creación del proyecto desde AutoClaw."
+      const lowerFinalContent = finalContent.toLowerCase();
+      if (
+        lowerFinalContent.includes("crea un proyecto") || 
+        lowerFinalContent.includes("create project") || 
+        lowerFinalContent.includes("nuevo proyecto")
+      ) {
+        // Mark message as pending for AutoClaw bridge so Commander picks it up
+        await supabaseServer
+          .from("conversation_messages")
+          .update({ 
+            metadata: { 
+              ...(userMessage.metadata || {}),
+              autoclaw_pending: true, 
+              autoclaw_agent: "commander", 
+              source: "command_center" 
+            } 
+          })
+          .eq("id", userMessage.id);
+
+        const { data: commAgent } = await supabaseServer.from("agents").select("id").eq("name", "commander").single();
+        const customResponseText = "✅ Comando recibido. Commander procesará la creación del proyecto desde AutoClaw.";
+
+        const { data: commanderResponse, error: cMsgErr } = await supabaseServer
+          .from("conversation_messages")
+          .insert({
+            conversation_id: commanderConvoId,
+            sender: "Commander",
+            sender_agent_id: commAgent?.id || null,
+            content: customResponseText,
+            message_type: "text",
+            metadata: { 
+              actions_taken: ["project_creation_delegated"]
+            }
+          })
+          .select()
+          .single();
+
+        if (cMsgErr) throw cMsgErr;
+
+        return res.json({
+          userMessage: {
+            ...userMessage,
+            metadata: {
+              ...(userMessage.metadata || {}),
+              autoclaw_pending: true,
+              autoclaw_agent: "commander",
+              source: "command_center"
+            }
+          },
+          commanderResponse,
+          memorySaved: false
+        });
+      }
+
       // 4. Construct instruction prompt for Gemini processing
       let promptMessage = content || "";
       if (uploadedFileInfo) {
@@ -2560,76 +2619,35 @@ Asegúrate de responder SOLO con el objeto JSON válido, sin bloques de código 
 
       if (uErr) throw uErr;
 
-      // 2. Load agent info to get "soul"
-      const { data: dbAgent } = await supabaseServer
-        .from("agents")
-        .select("*")
-        .eq("name", agentName.toLowerCase())
-        .single();
-
-      const soul = dbAgent?.soul || `Soy ${agentName.toUpperCase()}, tu asistente de automatización y operaciones.`;
-
-      // 3. Generate Agent Answer using AI Registry
-      let aiText = "";
-      try {
-        const provider = aiRegistry.getProviderForAgent(agentName);
-        const agentConfig = aiRegistry.getAgentConfig(agentName);
-
-        // Fetch last 10 messages for conversational context
-        const { data: historyMsgs } = await supabaseServer
-          .from("conversation_messages")
-          .select("sender, content")
-          .eq("conversation_id", convoId)
-          .order("created_at", { ascending: true })
-          .limit(10);
-
-        const mappedContext = (historyMsgs || []).map((m: any) => ({
-          role: (m.sender.toLowerCase() === "edwin" ? "user" : "assistant") as "user" | "assistant",
-          content: m.content
-        }));
-
-        const response = await provider.chat([
-          { 
-            role: "system", 
-            content: `Alma del Agente: ${soul}\nTu rol es: ${dbAgent?.role || "asistente"}.\nResponde a Edwin directamente en español, con un tono ultra profesional, técnico, con viñetas claras si es necesario.` 
-          },
-          ...mappedContext
-        ], {
-          temperature: agentConfig.temperature || 0.7,
-          maxTokens: agentConfig.maxTokens || 2048,
-          model: agentConfig.model
-        });
-
-        aiText = response.content;
-      } catch (aiErr: any) {
-        console.warn("AI generation failed or unconfigured, using fallback template:", aiErr.message);
-        // Realistic fallback matching agent identity
-        const nameUpper = agentName.toUpperCase();
-        if (agentName.toLowerCase() === "steve") {
-          aiText = `Hola Edwin, entiendo perfectamente la solicitud de investigación. He registrado el tema y los archivos en el proyecto. ¿Te gustaría que comience una búsqueda profunda de antecedentes sobre esto?`;
-        } else if (agentName.toLowerCase() === "elon") {
-          aiText = `Análisis recibido, Edwin. He cargado la información técnica y los parámetros de datos. ¿Procedemos con la simulación numérica y proyección de resultados?`;
-        } else if (agentName.toLowerCase() === "nikitta") {
-          aiText = `¡Genial, Edwin! Los materiales de marketing han sido clasificados correctamente. Ya estoy planeando la campaña y redacción de copys comerciales para estas audiencias.`;
-        } else {
-          aiText = `Hola Edwin. He recibido tu mensaje de forma exitosa y guardado los documentos correspondientes en el espacio de trabajo. ¿Cuáles son los siguientes pasos a ejecutar?`;
-        }
-      }
-
-      // 4. Insert Agent Answer
-      const { data: agentMsg } = await supabaseServer
+      // 2. Mark message as pending for AutoClaw bridge
+      const { data: msgUpdate } = await supabaseServer
         .from("conversation_messages")
-        .insert({
-          conversation_id: convoId,
-          sender: dbAgent?.display_name || agentName.toUpperCase(),
-          sender_agent_id: dbAgent?.id || null,
-          content: aiText,
-          message_type: "text"
-        })
+        .update({ metadata: { autoclaw_pending: true, autoclaw_agent: agentName.toLowerCase(), source: "command_center" } })
+        .eq("id", userMsg.id)
         .select()
         .single();
 
-      // Return all messages for this conversation
+      // 3. Poll for response from AutoClaw agent (max 30 seconds)
+      let agentResponse = null;
+      const startTime = Date.now();
+      while (Date.now() - startTime < 30000) {
+        await new Promise(r => setTimeout(r, 1500));
+        
+        const { data: recentMsgs } = await supabaseServer
+          .from("conversation_messages")
+          .select("*")
+          .eq("conversation_id", convoId)
+          .order("created_at", { ascending: false })
+          .limit(3);
+
+        const lastMsg = (recentMsgs || []).find(m => m.id !== userMsg.id && m.sender !== "Edwin" && m.sender !== "edwin");
+        if (lastMsg) {
+          agentResponse = lastMsg;
+          break;
+        }
+      }
+
+      // 4. Return messages
       const { data: allMessages } = await supabaseServer
         .from("conversation_messages")
         .select("*")
