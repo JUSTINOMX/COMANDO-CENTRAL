@@ -82,7 +82,7 @@ export default function ProjectWorkspace({ projectId, onBack }: ProjectWorkspace
   const { project, agents, antecedentes, extracciones, reportes, conclusiones, marketing } = data;
 
   return (
-    <div className="flex flex-col gap-6 p-6">
+    <div className="flex flex-col gap-4 sm:gap-6 p-3 sm:p-6">
       {/* Back button & header section */}
       <div className="flex flex-col gap-4 border-b border-border pb-5 md:flex-row md:items-start md:justify-between">
         <div className="flex flex-col gap-2">
@@ -142,7 +142,7 @@ export default function ProjectWorkspace({ projectId, onBack }: ProjectWorkspace
       </div>
 
       {/* Tabs navigation */}
-      <div className="flex items-center gap-1 border-b border-border overflow-x-auto">
+      <div className="flex items-center gap-1 border-b border-border overflow-x-auto whitespace-nowrap pb-1 no-scrollbar">
         <button
           onClick={() => setActiveTab("chat")}
           className={`flex items-center gap-2 border-b-2 px-4 py-2 text-xs font-bold transition-all uppercase tracking-wider cursor-pointer ${

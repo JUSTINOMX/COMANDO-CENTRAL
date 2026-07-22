@@ -86,7 +86,7 @@ export default function SkillsView({ skills, agents, onRefresh }: SkillsViewProp
   };
 
   return (
-    <div className="flex flex-col gap-6 p-6 animate-in fade-in duration-200">
+    <div className="flex flex-col gap-4 sm:gap-6 p-3 sm:p-6 animate-in fade-in duration-200">
       <div className="flex items-center justify-between border-b border-border pb-4">
         <div className="flex items-center gap-3">
           <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#E8F2FF] border border-primary/10">

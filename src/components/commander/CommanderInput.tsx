@@ -53,7 +53,7 @@ export default function CommanderInput({ projects, onSendMessage, isSending }: C
   };
 
   return (
-    <div className="flex flex-col gap-3.5 border-t border-border bg-white p-4 shadow-sm">
+    <div className="flex flex-col gap-2.5 sm:gap-3.5 border-t border-border bg-white p-2.5 sm:p-4 shadow-sm">
       {/* File Attacher Widget */}
       {showAttacher && (
         <div className="animate-in slide-in-from-bottom-2 duration-150">

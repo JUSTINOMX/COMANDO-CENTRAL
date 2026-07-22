@@ -1,14 +1,15 @@
 import React, { useState, useEffect } from "react";
-import { Bell, RefreshCw, Clock, Check, Inbox } from "lucide-react";
+import { Bell, RefreshCw, Clock, Check, Inbox, Menu } from "lucide-react";
 import { apiClient, AgentNotification } from "../lib/supabase/client.js";
 
 interface HeaderProps {
   title: string;
   notifications: AgentNotification[];
   onNotificationRead: () => void;
+  onToggleMobileMenu?: () => void;
 }
 
-export default function Header({ title, notifications, onNotificationRead }: HeaderProps) {
+export default function Header({ title, notifications, onNotificationRead, onToggleMobileMenu }: HeaderProps) {
   const [dbStatus, setDbStatus] = useState<"connected" | "disconnected" | "checking">("checking");
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [localTime, setLocalTime] = useState("");
@@ -74,22 +75,32 @@ export default function Header({ title, notifications, onNotificationRead }: Hea
   };
 
   return (
-    <header className="sticky top-0 z-30 flex h-16 w-full items-center justify-between border-b border-border bg-white/80 px-6 backdrop-blur-md">
-      {/* Title */}
-      <div className="flex items-center gap-3">
-        <h1 className="text-xl font-bold tracking-tight text-text-primary">{title}</h1>
+    <header className="sticky top-0 z-30 flex h-16 w-full items-center justify-between border-b border-border bg-white/90 px-3 sm:px-6 backdrop-blur-md">
+      {/* Mobile Toggle & Title */}
+      <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+        {onToggleMobileMenu && (
+          <button
+            onClick={onToggleMobileMenu}
+            className="md:hidden flex items-center justify-center rounded-lg p-2 text-text-primary hover:bg-gray-100 transition-colors focus:outline-none"
+            aria-label="Abrir menú de navegación"
+            title="Abrir menú"
+          >
+            <Menu className="h-5 w-5" />
+          </button>
+        )}
+        <h1 className="text-sm sm:text-lg md:text-xl font-bold tracking-tight text-text-primary truncate">{title}</h1>
       </div>
 
       {/* Stats and controls */}
-      <div className="flex items-center gap-6">
+      <div className="flex items-center gap-2 sm:gap-4 md:gap-6 shrink-0">
         {/* Local time */}
-        <div className="hidden items-center gap-2 text-sm font-medium text-text-secondary md:flex">
+        <div className="hidden items-center gap-2 text-sm font-medium text-text-secondary lg:flex">
           <Clock className="h-4 w-4 text-text-secondary/60" />
           <span className="font-mono">{localTime || "Loading..."}</span>
         </div>
 
         {/* Database status indicator */}
-        <div className="flex items-center gap-2 rounded-full bg-background px-3 py-1 text-xs font-semibold text-text-primary border border-border">
+        <div className="flex items-center gap-1.5 sm:gap-2 rounded-full bg-background px-2.5 sm:px-3 py-1 text-[11px] sm:text-xs font-semibold text-text-primary border border-border">
           <span
             className={`h-2 w-2 rounded-full ${
               dbStatus === "connected"
@@ -99,8 +110,11 @@ export default function Header({ title, notifications, onNotificationRead }: Hea
                 : "bg-amber-400"
             }`}
           />
-          <span className="capitalize">
-            {dbStatus === "checking" ? "Checking connection..." : `Supabase ${dbStatus}`}
+          <span className="capitalize hidden sm:inline">
+            {dbStatus === "checking" ? "Checking..." : `Supabase ${dbStatus}`}
+          </span>
+          <span className="capitalize sm:hidden">
+            {dbStatus === "connected" ? "OK" : dbStatus}
           </span>
         </div>
 
@@ -121,7 +135,7 @@ export default function Header({ title, notifications, onNotificationRead }: Hea
 
           {/* Notification Dropdown Menu */}
           {isDropdownOpen && (
-            <div className="absolute right-0 mt-2 w-96 origin-top-right rounded-xl border border-border bg-white p-2 shadow-xl ring-1 ring-black/5 focus:outline-none animate-in fade-in slide-in-from-top-3 duration-200">
+            <div className="fixed inset-x-3 top-16 z-50 md:absolute md:right-0 md:top-auto md:w-96 md:inset-x-auto mt-2 rounded-xl border border-border bg-white p-2 shadow-xl ring-1 ring-black/5 focus:outline-none animate-in fade-in slide-in-from-top-3 duration-200">
               <div className="flex items-center justify-between border-b border-border px-3 py-2 pb-3">
                 <span className="text-sm font-bold text-text-primary">Notifications</span>
                 {unreadCount > 0 && (

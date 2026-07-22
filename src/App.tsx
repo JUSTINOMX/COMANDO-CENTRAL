@@ -22,6 +22,8 @@ export default function App() {
   const [activeAgentName, setActiveAgentName] = useState<string | undefined>(undefined);
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
   const [refreshHistoryTrigger, setRefreshHistoryTrigger] = useState<number>(0);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isMobileHistoryOpen, setIsMobileHistoryOpen] = useState(false);
 
   // Core collections
   const [projects, setProjects] = useState<Project[]>([]);
@@ -64,6 +66,8 @@ export default function App() {
 
   const handleNavigate = (section: string, projectId?: string, agentName?: string) => {
     setActiveSection(section);
+    setIsMobileMenuOpen(false);
+    setIsMobileHistoryOpen(false);
     if (section === "project" && projectId) {
       setActiveProjectId(projectId);
     } else {
@@ -117,15 +121,18 @@ export default function App() {
         activeProjectId={activeProjectId}
         activeAgentName={activeAgentName}
         hasUnreadCommander={hasUnreadCommander}
+        isMobileOpen={isMobileMenuOpen}
+        onCloseMobile={() => setIsMobileMenuOpen(false)}
       />
 
       {/* Main Content Area */}
-      <div className="flex flex-1 flex-col overflow-hidden">
+      <div className="flex flex-1 flex-col overflow-hidden w-full">
         {/* Header Bar */}
         <Header
           title={getHeaderTitle()}
           notifications={notifications}
           onNotificationRead={fetchGlobalData}
+          onToggleMobileMenu={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
         />
 
         {/* Dynamic View Panel */}
@@ -221,20 +228,46 @@ export default function App() {
                   } as Agent;
 
                   return (
-                    <div className="flex h-full w-full overflow-hidden">
-                      <AgentChatWindow
-                        agent={selectedAgent}
-                        projects={projects}
-                        defaultProjectId={activeProjectId}
-                        activeConversationId={activeConversationId}
-                        onNewMessageSent={() => setRefreshHistoryTrigger(p => p + 1)}
-                      />
-                      <ConversationHistory
-                        agentName={activeAgentName}
-                        activeConversationId={activeConversationId}
-                        onSelectConversation={(convoId) => setActiveConversationId(convoId)}
-                        refreshTrigger={refreshHistoryTrigger}
-                      />
+                    <div className="relative flex h-full w-full overflow-hidden">
+                      {/* Mobile History Toggle Floating Button */}
+                      <button
+                        onClick={() => setIsMobileHistoryOpen(!isMobileHistoryOpen)}
+                        className="md:hidden absolute top-3 right-3 z-30 flex items-center gap-1.5 rounded-full bg-primary/90 px-3 py-1.5 text-xs font-bold text-white shadow-lg backdrop-blur-xs"
+                      >
+                        <span>📜 Historial</span>
+                      </button>
+
+                      <div className="flex-1 flex flex-col h-full overflow-hidden">
+                        <AgentChatWindow
+                          agent={selectedAgent}
+                          projects={projects}
+                          defaultProjectId={activeProjectId}
+                          activeConversationId={activeConversationId}
+                          onNewMessageSent={() => setRefreshHistoryTrigger(p => p + 1)}
+                        />
+                      </div>
+
+                      {/* History panel desktop + mobile drawer */}
+                      {isMobileHistoryOpen && (
+                        <div
+                          onClick={() => setIsMobileHistoryOpen(false)}
+                          className="fixed inset-0 z-30 bg-black/40 backdrop-blur-xs md:hidden"
+                        />
+                      )}
+                      
+                      <div className={`fixed inset-y-0 right-0 z-40 w-80 max-w-[85vw] bg-white shadow-2xl transition-transform duration-300 md:static md:z-0 md:w-80 md:shadow-none md:translate-x-0 ${
+                        isMobileHistoryOpen ? "translate-x-0" : "translate-x-full"
+                      }`}>
+                        <ConversationHistory
+                          agentName={activeAgentName}
+                          activeConversationId={activeConversationId}
+                          onSelectConversation={(convoId) => {
+                            setActiveConversationId(convoId);
+                            setIsMobileHistoryOpen(false);
+                          }}
+                          refreshTrigger={refreshHistoryTrigger}
+                        />
+                      </div>
                     </div>
                   );
                 })()

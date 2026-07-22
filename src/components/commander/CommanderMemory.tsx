@@ -52,7 +52,7 @@ export default function CommanderMemory({ onForgetMemory, agents, refreshTrigger
   };
 
   return (
-    <div className="flex h-full w-80 flex-col border-l border-border bg-white animate-in slide-in-from-right duration-200">
+    <div className="flex h-full w-full flex-col border-l border-border bg-white animate-in slide-in-from-right duration-200">
       {/* Header */}
       <div className="flex items-center justify-between border-b border-border p-4">
         <div className="flex items-center gap-2">

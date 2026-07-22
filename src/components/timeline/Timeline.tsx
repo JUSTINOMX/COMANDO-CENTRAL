@@ -143,7 +143,7 @@ export default function Timeline({ projects, agents, onProjectClick, onRefreshPr
   };
 
   return (
-    <div className="flex flex-col gap-6 p-6">
+    <div className="flex flex-col gap-4 sm:gap-6 p-3 sm:p-6">
       {/* SECTION A: COMMANDER CHAT ASSISTANT */}
       <section className="flex flex-col rounded-2xl border border-border bg-white shadow-sm overflow-hidden">
         {/* Header with blue gradient */}

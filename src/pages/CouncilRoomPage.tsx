@@ -39,6 +39,7 @@ export default function CouncilRoomPage() {
   const [isSending, setIsSending] = useState(false);
   const [currentSpeaker, setCurrentSpeaker] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [mobileTab, setMobileTab] = useState<"debate" | "participants" | "minutes">("debate");
 
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -223,73 +224,105 @@ export default function CouncilRoomPage() {
   ];
 
   return (
-    <div className="flex h-[calc(100vh-3.5rem)] w-full overflow-hidden bg-gray-50/20">
-
-      {/* Column 1: Participants List (Left) */}
-      <div className="hidden xl:flex w-72 shrink-0 flex-col border-r border-border bg-white p-5 justify-between">
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Users className="h-4 w-4 text-text-secondary" />
-              <span className="text-xs font-bold text-text-primary tracking-wide uppercase">Consejo Directivo</span>
-            </div>
-            <span className="rounded-full bg-[#E8F2FF] px-2 py-0.5 text-[10px] font-bold text-primary">
-              9 Miembros
-            </span>
-          </div>
-
-          <div className="space-y-1.5 overflow-y-auto max-h-[calc(100vh-14rem)] pr-1">
-            {participants.map((p, idx) => (
-              <div 
-                key={idx}
-                className={`flex items-center justify-between rounded-xl p-2.5 border transition-all ${
-                  p.status === "vacant"
-                    ? "bg-gray-50/50 border-gray-100/60 opacity-60"
-                    : p.name === currentSpeaker 
-                      ? "bg-primary/5 border-primary/20 shadow-xs" 
-                      : "bg-white border-border/50 hover:bg-gray-50/50"
-                }`}
-              >
-                <div className="flex items-center gap-3 truncate">
-                  <div className={`flex h-8 w-8 items-center justify-center rounded-lg border shrink-0 ${
-                    p.status === "vacant" 
-                      ? "bg-gray-100 border-gray-200 text-gray-400" 
-                      : p.name === currentSpeaker 
-                        ? "bg-primary text-white border-primary" 
-                        : "bg-gray-50 border-border/60 text-text-secondary"
-                  }`}>
-                    {p.status === "vacant" ? "🔒" : getAgentEmoji(p.name)}
-                  </div>
-                  <div className="truncate">
-                    <h4 className="text-xs font-bold text-text-primary truncate">{p.title}</h4>
-                    <p className="text-[10px] font-semibold text-text-secondary truncate">{p.role}</p>
-                  </div>
-                </div>
-
-                <div className="flex items-center shrink-0 pl-1">
-                  {p.status === "online" && (
-                    <span className={`h-2 w-2 rounded-full ${p.name === currentSpeaker ? "bg-primary animate-ping" : "bg-[#30D158]"}`} />
-                  )}
-                  {p.status === "vacant" && (
-                    <span className="text-[9px] font-bold text-[#8E8E93] bg-gray-100 px-1 py-0.2 rounded">Por designar</span>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
+    <div className="flex flex-col h-[calc(100vh-4rem)] w-full overflow-hidden bg-gray-50/20">
+      {/* Mobile Tab Selector */}
+      <div className="flex items-center gap-1 p-2 bg-white border-b border-border xl:hidden shrink-0">
         <button
-          onClick={handleReset}
-          className="flex items-center justify-center gap-2 rounded-xl border border-red-200 hover:bg-red-50 px-3 py-2 text-xs font-semibold text-red-600 transition-all cursor-pointer"
+          onClick={() => setMobileTab("debate")}
+          className={`flex-1 py-1.5 px-2 text-xs font-bold rounded-lg transition-colors ${
+            mobileTab === "debate" ? "bg-primary text-white shadow-xs" : "text-text-secondary bg-gray-50 hover:bg-gray-100"
+          }`}
         >
-          <Trash2 className="h-4 w-4" />
-          <span>Reiniciar Debate</span>
+          💬 Debate
+        </button>
+        <button
+          onClick={() => setMobileTab("participants")}
+          className={`flex-1 py-1.5 px-2 text-xs font-bold rounded-lg transition-colors ${
+            mobileTab === "participants" ? "bg-primary text-white shadow-xs" : "text-text-secondary bg-gray-50 hover:bg-gray-100"
+          }`}
+        >
+          👥 Miembros (9)
+        </button>
+        <button
+          onClick={() => setMobileTab("minutes")}
+          className={`flex-1 py-1.5 px-2 text-xs font-bold rounded-lg transition-colors ${
+            mobileTab === "minutes" ? "bg-primary text-white shadow-xs" : "text-text-secondary bg-gray-50 hover:bg-gray-100"
+          }`}
+        >
+          📜 Acta DONNA
         </button>
       </div>
 
-      {/* Column 2: Live Debate (Center Chat) */}
-      <div className="flex flex-1 flex-col overflow-hidden bg-white">
+      <div className="flex flex-1 w-full overflow-hidden">
+        {/* Column 1: Participants List (Left) */}
+        <div className={`${
+          mobileTab === "participants" ? "flex w-full" : "hidden"
+        } xl:flex xl:w-72 shrink-0 flex-col border-r border-border bg-white p-4 sm:p-5 justify-between overflow-y-auto`}>
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Users className="h-4 w-4 text-text-secondary" />
+                <span className="text-xs font-bold text-text-primary tracking-wide uppercase">Consejo Directivo</span>
+              </div>
+              <span className="rounded-full bg-[#E8F2FF] px-2 py-0.5 text-[10px] font-bold text-primary">
+                9 Miembros
+              </span>
+            </div>
+
+            <div className="space-y-1.5 max-h-[calc(100vh-16rem)] overflow-y-auto pr-1">
+              {participants.map((p, idx) => (
+                <div 
+                  key={idx}
+                  className={`flex items-center justify-between rounded-xl p-2.5 border transition-all ${
+                    p.status === "vacant"
+                      ? "bg-gray-50/50 border-gray-100/60 opacity-60"
+                      : p.name === currentSpeaker 
+                        ? "bg-primary/5 border-primary/20 shadow-xs" 
+                        : "bg-white border-border/50 hover:bg-gray-50/50"
+                  }`}
+                >
+                  <div className="flex items-center gap-3 truncate">
+                    <div className={`flex h-8 w-8 items-center justify-center rounded-lg border shrink-0 ${
+                      p.status === "vacant" 
+                        ? "bg-gray-100 border-gray-200 text-gray-400" 
+                        : p.name === currentSpeaker 
+                          ? "bg-primary text-white border-primary" 
+                          : "bg-gray-50 border-border/60 text-text-secondary"
+                    }`}>
+                      {p.status === "vacant" ? "🔒" : getAgentEmoji(p.name)}
+                    </div>
+                    <div className="truncate">
+                      <h4 className="text-xs font-bold text-text-primary truncate">{p.title}</h4>
+                      <p className="text-[10px] font-semibold text-text-secondary truncate">{p.role}</p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center shrink-0 pl-1">
+                    {p.status === "online" && (
+                      <span className={`h-2 w-2 rounded-full ${p.name === currentSpeaker ? "bg-primary animate-ping" : "bg-[#30D158]"}`} />
+                    )}
+                    {p.status === "vacant" && (
+                      <span className="text-[9px] font-bold text-[#8E8E93] bg-gray-100 px-1 py-0.2 rounded">Por designar</span>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <button
+            onClick={handleReset}
+            className="flex items-center justify-center gap-2 rounded-xl border border-red-200 hover:bg-red-50 px-3 py-2 text-xs font-semibold text-red-600 transition-all cursor-pointer mt-4"
+          >
+            <Trash2 className="h-4 w-4" />
+            <span>Reiniciar Debate</span>
+          </button>
+        </div>
+
+        {/* Column 2: Live Debate (Center Chat) */}
+        <div className={`${
+          mobileTab === "debate" ? "flex" : "hidden"
+        } xl:flex flex-1 flex-col overflow-hidden bg-white`}>
         
         {/* Chat Feed */}
         <div 
@@ -397,7 +430,9 @@ export default function CouncilRoomPage() {
       </div>
 
       {/* Column 3: DONNA's Minutes Board (Right) */}
-      <div className="hidden lg:flex w-80 shrink-0 flex-col border-l border-border bg-white p-5 space-y-4 overflow-y-auto">
+      <div className={`${
+        mobileTab === "minutes" ? "flex w-full" : "hidden"
+      } lg:flex lg:w-80 shrink-0 flex-col border-l border-border bg-white p-4 sm:p-5 space-y-4 overflow-y-auto`}>
         <div className="flex items-center gap-2 pb-2 border-b border-border/60">
           <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-50 border border-indigo-100 text-indigo-600 shrink-0">
             📝
@@ -479,7 +514,7 @@ export default function CouncilRoomPage() {
           )}
         </div>
       </div>
-
     </div>
-  );
+  </div>
+);
 }

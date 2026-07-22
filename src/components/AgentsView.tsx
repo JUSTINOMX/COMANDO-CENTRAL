@@ -57,7 +57,7 @@ export default function AgentsView({ agents, projects = [], onRefresh }: AgentsV
   };
 
   return (
-    <div className="flex flex-col gap-6 p-6 animate-in fade-in duration-200">
+    <div className="flex flex-col gap-4 sm:gap-6 p-3 sm:p-6 animate-in fade-in duration-200">
       
       {/* Tab Selector Nav */}
       <div className="flex border-b border-gray-200">

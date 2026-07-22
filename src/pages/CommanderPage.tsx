@@ -23,7 +23,12 @@ export default function CommanderPage({
   const [hasMore, setHasMore] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
   const [isSending, setIsSending] = useState(false);
-  const [isMemoryOpen, setIsMemoryOpen] = useState(true);
+  const [isMemoryOpen, setIsMemoryOpen] = useState(() => {
+    if (typeof window !== "undefined") {
+      return window.innerWidth >= 768;
+    }
+    return false;
+  });
   const [refreshMemoriesCounter, setRefreshMemoriesCounter] = useState(0);
   
   // GitHub installation states
@@ -182,9 +187,9 @@ export default function CommanderPage({
   };
 
   return (
-    <div className="flex h-full w-full overflow-hidden bg-background">
+    <div className="relative flex h-full w-full overflow-hidden bg-background">
       {/* Primary chat layout */}
-      <div className="flex flex-1 flex-col overflow-hidden">
+      <div className="flex flex-1 flex-col overflow-hidden w-full">
         {/* Header Console Banner */}
         <CommanderHeader
           isMemoryOpen={isMemoryOpen}
@@ -209,13 +214,22 @@ export default function CommanderPage({
         />
       </div>
 
-      {/* Slide-out / Collapsible Memory Side Panel */}
+      {/* Slide-out / Collapsible Memory Side Panel with mobile overlay */}
       {isMemoryOpen && (
-        <CommanderMemory
-          onForgetMemory={handleForgetMemory}
-          agents={agents}
-          refreshTrigger={refreshMemoriesCounter}
-        />
+        <>
+          <div 
+            onClick={() => setIsMemoryOpen(false)} 
+            className="fixed inset-0 z-30 bg-black/40 backdrop-blur-xs md:hidden"
+            aria-hidden="true"
+          />
+          <div className="fixed inset-y-0 right-0 z-40 w-80 max-w-[85vw] bg-white shadow-2xl md:relative md:z-0 md:w-80 md:shadow-none h-full border-l border-border">
+            <CommanderMemory
+              onForgetMemory={handleForgetMemory}
+              agents={agents}
+              refreshTrigger={refreshMemoriesCounter}
+            />
+          </div>
+        </>
       )}
 
       {/* GitHub Installation Modal Overlay */}
